@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,13 +20,16 @@ import (
 
 	ggr "github.com/aerokube/ggr/config"
 	"github.com/aerokube/selenoid/config"
+	"github.com/aerokube/selenoid/logger"
 	"github.com/aerokube/selenoid/protect"
+	"github.com/aerokube/selenoid/server"
 	"github.com/aerokube/selenoid/service"
 	"github.com/aerokube/selenoid/session"
 	"github.com/aerokube/selenoid/upload"
 	"github.com/aerokube/util"
 	"github.com/aerokube/util/docker"
 	"github.com/docker/docker/client"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -72,7 +72,7 @@ var (
 func init() {
 	var mem service.MemLimit
 	var cpu service.CpuLimit
-	flag.BoolVar(&disableDocker, "disable-docker", false, "Disable docker support")
+	flag.BoolVar(&disableDocker, "disable-docker", true, "Disable docker support")
 	flag.BoolVar(&disableQueue, "disable-queue", false, "Disable wait queue")
 	flag.BoolVar(&enableFileUpload, "enable-file-upload", false, "File upload support")
 	flag.StringVar(&listen, "listen", ":4444", "Network address to accept connections")
@@ -102,7 +102,7 @@ func init() {
 		showVersion()
 		os.Exit(0)
 	}
-
+	// fmt.Printf("saveAllLogs - %t", saveAllLogs)
 	var err error
 	hostname, err = os.Hostname()
 	if err != nil {
@@ -120,7 +120,7 @@ func init() {
 	onSIGHUP(func() {
 		err := conf.Load(confPath, logConfPath)
 		if err != nil {
-			log.Printf("[-] [INIT] [%s: %v]", os.Args[0], err)
+			log.Info("[-] [INIT] [%s: %v]", os.Args[0], err)
 		}
 	})
 	inDocker := false
@@ -138,7 +138,7 @@ func init() {
 		if err != nil {
 			log.Fatalf("[-] [INIT] [Failed to create video output dir %s: %v]", videoOutputDir, err)
 		}
-		log.Printf("[-] [INIT] [Video Dir: %s]", videoOutputDir)
+		log.Info("[-] [INIT] [Video Dir: %s]", videoOutputDir)
 	}
 	if logOutputDir != "" {
 		logOutputDir, err = filepath.Abs(logOutputDir)
@@ -149,9 +149,8 @@ func init() {
 		if err != nil {
 			log.Fatalf("[-] [INIT] [Failed to create log output dir %s: %v]", logOutputDir, err)
 		}
-		log.Printf("[-] [INIT] [Logs Dir: %s]", logOutputDir)
 		if saveAllLogs {
-			log.Printf("[-] [INIT] [Saving all logs]")
+			log.Info("[-] [INIT] [Saving all logs]")
 		}
 	}
 
@@ -190,13 +189,13 @@ func init() {
 	environment.IP = ip
 	cli, err = docker.CreateCompatibleDockerClient(
 		func(specifiedApiVersion string) {
-			log.Printf("[-] [INIT] [Using Docker API version: %s]", specifiedApiVersion)
+			log.Info("[-] [INIT] [Using Docker API version: %s]", specifiedApiVersion)
 		},
 		func(determinedApiVersion string) {
-			log.Printf("[-] [INIT] [Your Docker API version is %s]", determinedApiVersion)
+			log.Info("[-] [INIT] [Your Docker API version is %s]", determinedApiVersion)
 		},
 		func(defaultApiVersion string) {
-			log.Printf("[-] [INIT] [Did not manage to determine your Docker API version - using default version: %s]", defaultApiVersion)
+			log.Info("[-] [INIT] [Did not manage to determine your Docker API version - using default version: %s]", defaultApiVersion)
 		},
 	)
 	if err != nil {
@@ -218,7 +217,7 @@ func parseGgrHost(s string) *ggr.Host {
 		Name: h,
 		Port: ggrPort,
 	}
-	log.Printf("[-] [INIT] [Will prefix all session IDs with a hash-sum: %s]", host.Sum())
+	log.Info("[-] [INIT] [Will prefix all session IDs with a hash-sum: %s]", host.Sum())
 	return host
 }
 
@@ -280,7 +279,7 @@ func video(w http.ResponseWriter, r *http.Request) {
 		listFilesAsJson(requestId, w, videoOutputDir, "VIDEO_ERROR")
 		return
 	}
-	log.Printf("[%d] [VIDEO_LISTING] [%s] [%s]", requestId, user, remote)
+	log.Info("[%d] [VIDEO_LISTING] [%s] [%s]", requestId, user, remote)
 	fileServer := http.StripPrefix(paths.Video, http.FileServer(http.Dir(videoOutputDir)))
 	fileServer.ServeHTTP(w, r)
 }
@@ -299,7 +298,7 @@ func deleteFileIfExists(requestId uint64, w http.ResponseWriter, r *http.Request
 		http.Error(w, fmt.Sprintf("Failed to delete file %s: %v", filePath, err), http.StatusInternalServerError)
 		return
 	}
-	log.Printf("[%d] [%s] [%s] [%s] [%s]", requestId, status, user, remote, fileName)
+	log.Infof("[%d] [%s] [%s] [%s] [%s]", requestId, status, user, remote, fileName)
 }
 
 var paths = struct {
@@ -319,15 +318,18 @@ var paths = struct {
 	Welcome:   "/",
 }
 
+func handleSelenium(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+	r.URL.Scheme = "http"
+	r.URL.Host = (&request{r}).localaddr()
+	r.URL.Path = strings.TrimPrefix(r.URL.Path, paths.WdHub)
+	selenium().ServeHTTP(w, r)
+}
+
 func handler() http.Handler {
 	root := http.NewServeMux()
-	root.HandleFunc(paths.WdHub+"/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/json")
-		r.URL.Scheme = "http"
-		r.URL.Host = (&request{r}).localaddr()
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, paths.WdHub)
-		selenium().ServeHTTP(w, r)
-	})
+	loggingMiddleware := logger.LoggingMiddleware()
+	root.HandleFunc(paths.WdHub+"/", loggingMiddleware(handleSelenium))
 	root.HandleFunc(paths.Error, func(w http.ResponseWriter, r *http.Request) {
 		util.JsonError(w, "Session timed out or not found", http.StatusNotFound)
 	})
@@ -335,7 +337,7 @@ func handler() http.Handler {
 		w.Header().Add("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(conf.State(sessions, limit, queue.Queued(), queue.Pending()))
 	})
-	root.HandleFunc(paths.Ping, ping)
+	root.HandleFunc(paths.Ping, loggingMiddleware(ping))
 	root.Handle(paths.VNC, websocket.Handler(vnc))
 	root.HandleFunc(paths.Logs, logs)
 	root.HandleFunc(paths.Video, video)
@@ -350,49 +352,39 @@ func handler() http.Handler {
 }
 
 func showVersion() {
-	fmt.Printf("Git Revision: %s\n", gitRevision)
-	fmt.Printf("UTC Build Time: %s\n", buildStamp)
+	log.Infof("Git Revision: %s", gitRevision)
+	log.Infof("UTC Build Time: %s", buildStamp)
 }
 
 func main() {
-	log.Printf("[-] [INIT] [Timezone: %s]", time.Local)
-	log.Printf("[-] [INIT] [Listening on %s]", listen)
+	// Logfmt is a structured, key=val logging format that is easy to read and parse
+	// logger = logNew.NewLogfmtLogger(logNew.NewSyncWriter(os.Stderr))
+	// Direct any attempts to use Go's log package to our structured logger
+
+	// Log the timestamp (in UTC) and the callsite (file + line number) of the logging
+	// call for debugging in the future.
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stderr)
+	// logger.SetFormatter(&logger.JSONFormatter{})
+	// logger = logNew.With(logger, "ts", logNew.DefaultTimestampUTC, "loc", logNew.DefaultCaller)
+	// log.Printf("[-] [INIT] [Timezone: %s]", time.Local)
+	// log.Printf("[-] [INIT] [Listening on %s]", listen)
 
 	stop := make(chan os.Signal)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	server := &http.Server{
+	server.Server = &http.Server{
 		Addr:    listen,
 		Handler: handler(),
 	}
 	e := make(chan error)
 	go func() {
-		e <- server.ListenAndServe()
+		e <- server.Server.ListenAndServe()
 	}()
 	select {
 	case err := <-e:
 		log.Fatalf("[-] [INIT] [Failed to start: %v]", err)
 	case <-stop:
 	}
-
-	log.Printf("[-] [SHUTTING_DOWN] [%s]", gracefulPeriod)
-	ctx, cancel := context.WithTimeout(context.Background(), gracefulPeriod)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("[-] [SHUTTING_DOWN] [Failed to shut down: %v]", err)
-	}
-
-	sessions.Each(func(k string, s *session.Session) {
-		if enableFileUpload {
-			os.RemoveAll(path.Join(os.TempDir(), k))
-		}
-		s.Cancel()
-	})
-
-	if !disableDocker {
-		err := cli.Close()
-		if err != nil {
-			log.Fatalf("[-] [SHUTTING_DOWN] [Error closing Docker client: %v]", err)
-		}
-	}
+	server.StopServer(gracefulPeriod)
 }

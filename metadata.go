@@ -4,12 +4,13 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/aerokube/selenoid/event"
-	"github.com/aerokube/selenoid/session"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/aerokube/selenoid/event"
+	"github.com/aerokube/selenoid/session"
 )
 
 const metadataFileExtension = ".json"
@@ -17,7 +18,7 @@ const metadataFileExtension = ".json"
 func init() {
 	mp := &MetadataProcessor{}
 	event.AddSessionStoppedListener(mp)
-	log.Println("[-] [INIT] [Will save sessions metadata]")
+	// log.Infof("Will save sessions metadata")
 }
 
 type MetadataProcessor struct {

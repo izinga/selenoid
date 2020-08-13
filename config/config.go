@@ -1,17 +1,18 @@
 package config
 
 import (
-	"log"
-
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strings"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
+
+	"time"
+
 	"github.com/aerokube/selenoid/session"
 	"github.com/docker/docker/api/types/container"
-	"time"
 )
 
 // Session - session id and vnc flag
@@ -97,7 +98,7 @@ func loadJSON(filename string, v interface{}) error {
 
 // Load loads config from file
 func (config *Config) Load(browsers, containerLogs string) error {
-	log.Println("[-] [INIT] [Loading configuration files...]")
+	log.Info("Loading configuration files...")
 	br := make(map[string]Versions)
 	err := loadJSON(browsers, &br)
 	if err != nil {

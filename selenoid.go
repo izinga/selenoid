@@ -8,9 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/aerokube/selenoid/event"
-	"github.com/aerokube/selenoid/service"
-	"github.com/imdario/mergo"
 	"io"
 	"io/ioutil"
 	"log"
@@ -25,6 +22,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/aerokube/selenoid/event"
+	"github.com/aerokube/selenoid/service"
+	"github.com/imdario/mergo"
 
 	"github.com/aerokube/selenoid/session"
 	"github.com/aerokube/util"
@@ -132,6 +133,11 @@ func create(w http.ResponseWriter, r *http.Request) {
 		queue.Drop()
 		return
 	}
+	browser.Caps.Log = true
+	browser.Caps.Video = true
+	browser.Caps.VNC = true
+	browserData, err := json.Marshal(browser)
+	fmt.Printf("\nWe got the caps '%s' and raw data is '%s'\n", string(browserData), string(body))
 	if browser.W3CCaps.Caps.BrowserName() != "" && browser.Caps.BrowserName() == "" {
 		browser.Caps = browser.W3CCaps.Caps
 	}
