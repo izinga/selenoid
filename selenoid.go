@@ -136,7 +136,6 @@ func create(w http.ResponseWriter, r *http.Request) {
 	browser.Caps.Log = true
 	browser.Caps.Video = true
 	browser.Caps.VNC = true
-	browserData, err := json.Marshal(browser)
 	// fmt.Printf("\nWe got the caps '%s' and raw data is '%s'\n", string(browserData), string(body))
 	if browser.W3CCaps.Caps.BrowserName() != "" && browser.Caps.BrowserName() == "" {
 		browser.Caps = browser.W3CCaps.Caps

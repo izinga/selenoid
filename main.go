@@ -62,6 +62,11 @@ var (
 	manager                  service.Manager
 	cli                      *client.Client
 
+	// Added by om
+	testsessionID string
+	nerveServer   string
+	resultID      string
+
 	startTime = time.Now()
 
 	version     bool
@@ -72,6 +77,9 @@ var (
 func init() {
 	var mem service.MemLimit
 	var cpu service.CpuLimit
+	flag.StringVar(&nerveServer, "nerveServer", "", "nerve server ")
+	flag.StringVar(&testsessionID, "testsessionID", "", "test session id")
+	flag.StringVar(&resultID, "resultID", "", "result id")
 	flag.BoolVar(&disableDocker, "disable-docker", true, "Disable docker support")
 	flag.BoolVar(&disableQueue, "disable-queue", false, "Disable wait queue")
 	flag.BoolVar(&enableFileUpload, "enable-file-upload", false, "File upload support")
@@ -129,6 +137,16 @@ func init() {
 		inDocker = true
 	}
 
+	if nerveServer == "" {
+		log.Error("We cant start selenium without nerve server ")
+		os.Exit(1)
+	}
+
+	if testsessionID == "" {
+		log.Error("We cant start selenium without valid test session ID ")
+		os.Exit(1)
+	}
+	logger.Setup(nerveServer, testsessionID, resultID)
 	if !disableDocker {
 		videoOutputDir, err = filepath.Abs(videoOutputDir)
 		if err != nil {

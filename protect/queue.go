@@ -1,10 +1,11 @@
 package protect
 
 import (
-	"log"
 	"math"
 	"net/http"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/aerokube/util"
 )
