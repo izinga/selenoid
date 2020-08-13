@@ -104,7 +104,7 @@ func (config *Config) Load(browsers, containerLogs string) error {
 	if err != nil {
 		return fmt.Errorf("browsers config: %v", err)
 	}
-	log.Printf("[-] [INIT] [Loaded configuration from %s]", browsers)
+	log.Info("Loaded configuration from %s", browsers)
 	cl := &container.LogConfig{}
 	if containerLogs != "" {
 		err = loadJSON(containerLogs, cl)
@@ -129,7 +129,7 @@ func (config *Config) Find(name string, version string) (*Browser, string, bool)
 		return nil, "", false
 	}
 	if version == "" {
-		log.Printf("[-] [DEFAULT_VERSION] [Using default version: %s]", browser.Default)
+		log.Info("Using default version: %s", browser.Default)
 		version = browser.Default
 		if version == "" {
 			return nil, "", false

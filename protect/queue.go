@@ -66,13 +66,13 @@ func (q *Queue) Protect(next http.HandlerFunc) http.HandlerFunc {
 		select {
 		case <-r.Context().Done():
 			<-q.queued
-			log.Printf("[-] [CLIENT_DISCONNECTED] [%s] [%s] [%s]", user, remote, time.Since(s))
+			log.Infof("[-] [CLIENT_DISCONNECTED] [%s] [%s] [%s]", user, remote, time.Since(s))
 			return
 		case q.limit <- struct{}{}:
 			q.pending <- struct{}{}
 		}
 		<-q.queued
-		log.Printf("[-] [NEW_REQUEST_ACCEPTED] [%s] [%s]", user, remote)
+		log.Infof("[-] [NEW_REQUEST_ACCEPTED] [%s] [%s]", user, remote)
 		next.ServeHTTP(w, r)
 	}
 }
