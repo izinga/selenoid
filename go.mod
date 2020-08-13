@@ -13,8 +13,10 @@ require (
 	github.com/go-kit/kit v0.10.0
 	github.com/go-resty/resty/v2 v2.3.0
 	github.com/gorilla/websocket v1.4.2
+	github.com/hashicorp/go-version v1.2.1 // indirect
 	github.com/imdario/mergo v0.3.6
 	github.com/mafredri/cdp v0.21.0
+	github.com/mitchellh/gox v1.0.1 // indirect
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
