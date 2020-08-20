@@ -20,12 +20,12 @@
         }
     },
     "safari": {
-        "default": " 13",
+        "default": "13",
         "versions": {
             "13": {
                 "image": ["/usr/bin/safaridriver"],
                 "port": "4444",
-                "path": "/wd/hub"
+                "path": "/"
             }
         }
     }

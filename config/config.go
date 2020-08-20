@@ -104,7 +104,7 @@ func (config *Config) Load(browsers, containerLogs string) error {
 	if err != nil {
 		return fmt.Errorf("browsers config: %v", err)
 	}
-	log.Info("Loaded configuration from %s", browsers)
+	log.Infof("Loaded configuration from %s", browsers)
 	cl := &container.LogConfig{}
 	if containerLogs != "" {
 		err = loadJSON(containerLogs, cl)
